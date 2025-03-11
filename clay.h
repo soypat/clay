@@ -1658,11 +1658,15 @@ void Clay__CloseElement(void) {
     }
 
     // Attach children to the current open element
-    openLayoutElement->childrenOrTextContent.children.elements = &context->layoutElementChildren.internalArray[context->layoutElementChildren.length];
+    Clay__int32_tArray openLayoutChildren = CLAY__INIT(Clay__int32_tArray) { 
+        .length = openLayoutElement->childrenOrTextContent.children.length, 
+        .internalArray = context->layoutElementChildren.internalArray[context->layoutElementChildren.length - openLayoutElement->childrenOrTextContent.children.length], 
+        .capacity = context->layoutElementChildren.capacity-context->layoutElementChildren.length - openLayoutElement->childrenOrTextContent.children.length
+    };
     if (layoutConfig->layoutDirection == CLAY_LEFT_TO_RIGHT) {
         openLayoutElement->dimensions.width = (float)(layoutConfig->padding.left + layoutConfig->padding.right);
-        for (int32_t i = 0; i < openLayoutElement->childrenOrTextContent.children.length; i++) {
-            int32_t childIndex = Clay__int32_tArray_GetValue(&context->layoutElementChildrenBuffer, (int)context->layoutElementChildrenBuffer.length - openLayoutElement->childrenOrTextContent.children.length + i);
+        for (int32_t i = 0; i < openLayoutChildren.length; i++) {
+            int32_t childIndex = Clay__int32_tArray_GetValue(&openLayoutChildren, (int) i);
             Clay_LayoutElement *child = Clay_LayoutElementArray_Get(&context->layoutElements, childIndex);
             openLayoutElement->dimensions.width += child->dimensions.width;
             openLayoutElement->dimensions.height = CLAY__MAX(openLayoutElement->dimensions.height, child->dimensions.height + layoutConfig->padding.top + layoutConfig->padding.bottom);
@@ -1675,14 +1679,14 @@ void Clay__CloseElement(void) {
             }
             Clay__int32_tArray_Add(&context->layoutElementChildren, childIndex);
         }
-        float childGap = (float)(CLAY__MAX(openLayoutElement->childrenOrTextContent.children.length - 1, 0) * layoutConfig->childGap);
+        float childGap = (float)(CLAY__MAX(openLayoutChildren.length - 1, 0) * layoutConfig->childGap);
         openLayoutElement->dimensions.width += childGap; // TODO this is technically a bug with childgap and scroll containers
         openLayoutElement->minDimensions.width += childGap;
     }
     else if (layoutConfig->layoutDirection == CLAY_TOP_TO_BOTTOM) {
         openLayoutElement->dimensions.height = (float)(layoutConfig->padding.top + layoutConfig->padding.bottom);
-        for (int32_t i = 0; i < openLayoutElement->childrenOrTextContent.children.length; i++) {
-            int32_t childIndex = Clay__int32_tArray_GetValue(&context->layoutElementChildrenBuffer, (int)context->layoutElementChildrenBuffer.length - openLayoutElement->childrenOrTextContent.children.length + i);
+        for (int32_t i = 0; i < openLayoutChildren.length; i++) {
+            int32_t childIndex = Clay__int32_tArray_GetValue(&openLayoutChildren, (int) i);
             Clay_LayoutElement *child = Clay_LayoutElementArray_Get(&context->layoutElements, childIndex);
             openLayoutElement->dimensions.height += child->dimensions.height;
             openLayoutElement->dimensions.width = CLAY__MAX(openLayoutElement->dimensions.width, child->dimensions.width + layoutConfig->padding.left + layoutConfig->padding.right);
@@ -1695,12 +1699,12 @@ void Clay__CloseElement(void) {
             }
             Clay__int32_tArray_Add(&context->layoutElementChildren, childIndex);
         }
-        float childGap = (float)(CLAY__MAX(openLayoutElement->childrenOrTextContent.children.length - 1, 0) * layoutConfig->childGap);
+        float childGap = (float)(CLAY__MAX(openLayoutChildren.length - 1, 0) * layoutConfig->childGap);
         openLayoutElement->dimensions.height += childGap; // TODO this is technically a bug with childgap and scroll containers
         openLayoutElement->minDimensions.height += childGap;
     }
 
-    context->layoutElementChildrenBuffer.length -= openLayoutElement->childrenOrTextContent.children.length;
+    context->layoutElementChildrenBuffer.length -= openLayoutChildren.length;
 
     // Clamp element min and max width to the values configured in the layout
     if (layoutConfig->sizing.width.type != CLAY__SIZING_TYPE_PERCENT) {
@@ -1733,9 +1737,11 @@ void Clay__CloseElement(void) {
     openLayoutElement = Clay__GetOpenLayoutElement();
 
     if (!elementIsFloating && context->openLayoutElementStack.length > 1) {
-        openLayoutElement->childrenOrTextContent.children.length++;
+        openLayoutChildren.length++;
         Clay__int32_tArray_Add(&context->layoutElementChildrenBuffer, closingElementIndex);
     }
+    openLayoutElement->childrenOrTextContent.children.elements = openLayoutChildren.internalArray;
+    openLayoutElement->childrenOrTextContent.children.length = openLayoutChildren.length;
 }
 
 bool Clay__MemCmp(const char *s1, const char *s2, int32_t length);
